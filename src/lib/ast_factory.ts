@@ -5,6 +5,10 @@
 
 import * as ast from './ast.js';
 
+export interface AstFactoryOptions {
+  caseInsensitivePropertyAccess?: boolean;
+}
+
 export interface AstFactory<E extends ast.Expression> {
   empty(): E;
   literal(value: ast.LiteralValue): E;
@@ -23,9 +27,22 @@ export interface AstFactory<E extends ast.Expression> {
   map(entries: {[key: string]: E | undefined} | undefined): E;
   list(items: Array<E | undefined> | undefined): E;
   arrowFunction(params: Array<string>, body: E | undefined): E;
+  setOptions(options: AstFactoryOptions): AstFactory<E>;
+  getOptions(): AstFactoryOptions;
 }
 
 export class DefaultAstFactory implements AstFactory<ast.Expression> {
+  private options: AstFactoryOptions = {}
+
+  setOptions(options: AstFactoryOptions): AstFactory<ast.Expression> {
+    this.options = !options ? {} : options;
+    return this;
+  }
+
+  getOptions(): AstFactoryOptions {
+    return this.options;
+  }
+  
   empty(): ast.Empty {
     return {type: 'Empty'};
   }

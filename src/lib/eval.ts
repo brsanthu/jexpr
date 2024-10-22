@@ -4,7 +4,7 @@
  */
 
 import * as ast from './ast.js';
-import {AstFactory} from './ast_factory.js';
+import {AstFactory, AstFactoryOptions} from './ast_factory.js';
 
 const {hasOwn, fromEntries} = Object;
 
@@ -116,7 +116,35 @@ export interface ArrowFunction extends Evaluatable {
   body: Expression;
 }
 
+function getPropertyValue(scope: any, key: string, options: AstFactoryOptions) {
+  if (scope === undefined || !options?.caseInsensitivePropertyAccess) {
+    return scope?.[key];
+  }
+
+  const val = scope[key];
+  if (val === undefined) {
+    for (const key2 of Object.keys(scope)) {
+      if (key2.toLowerCase() === key.toLowerCase()) {
+        return scope[key2];
+      }
+    }
+  }
+
+  return val;
+}
+
 export class EvalAstFactory implements AstFactory<Expression> {
+  private options: AstFactoryOptions = {};
+
+  setOptions(options: AstFactoryOptions) {
+    this.options = !options ? {} : options;
+    return this;
+  }
+
+  getOptions(): AstFactoryOptions {
+    return this.options;
+  }
+
   empty(): Empty {
     // TODO(justinfagnani): return null instead?
     return {
@@ -145,13 +173,15 @@ export class EvalAstFactory implements AstFactory<Expression> {
   }
 
   id(v: string): ID {
+    const evalOptions = this.options;
+
     return {
       type: 'ID',
       value: v,
       evaluate(scope) {
         // TODO(justinfagnani): this prevents access to properties named 'this'
         if (this.value === 'this') return scope;
-        return scope?.[this.value];
+        return getPropertyValue(scope, this.value, evalOptions);
       },
       getIds(idents) {
         idents.push(this.value);
@@ -220,12 +250,14 @@ export class EvalAstFactory implements AstFactory<Expression> {
   }
 
   getter(g: Expression, n: string): Getter {
+    const evalOptions = this.options;
+
     return {
       type: 'Getter',
       receiver: g,
       name: n,
       evaluate(scope) {
-        return this.receiver.evaluate(scope)?.[this.name];
+        return getPropertyValue(this.receiver.evaluate(scope), this.name, evalOptions);
       },
       getIds(idents) {
         this.receiver.getIds(idents);
@@ -238,6 +270,9 @@ export class EvalAstFactory implements AstFactory<Expression> {
     if (method != null && typeof method !== 'string') {
       throw new Error('method not a string');
     }
+
+    const evalOptions = this.options;
+
     return {
       type: 'Invoke',
       receiver: receiver,
@@ -249,7 +284,9 @@ export class EvalAstFactory implements AstFactory<Expression> {
         // invoking a top-level function rather than a method. If method is
         // defined on a nested scope, then we should probably set _this to null.
         const _this = this.method ? receiver : scope?.['this'] ?? scope;
-        const f = this.method ? receiver?.[method] : receiver;
+        const f = this.method
+          ? getPropertyValue(receiver, method, evalOptions)
+          : receiver;
         const args = this.arguments ?? [];
         const argValues = args.map((a) => a?.evaluate(scope));
         return f?.apply?.(_this, argValues);
@@ -267,12 +304,14 @@ export class EvalAstFactory implements AstFactory<Expression> {
   }
 
   index(e: Expression, a: Expression): Index {
+    const evalOptions = this.options;
+
     return {
       type: 'Index',
       receiver: e,
       argument: a,
       evaluate(scope) {
-        return this.receiver.evaluate(scope)?.[this.argument.evaluate(scope)];
+        return getPropertyValue(this.receiver.evaluate(scope), this.argument.evaluate(scope), evalOptions);
       },
       getIds(idents) {
         this.receiver.getIds(idents);

@@ -65,6 +65,29 @@ Expressions are generally null-safe. If a subexpression yields `null` or
 an exception. Property access, method invocation and operators are null-safe.
 Passing null to a function that doesn't handle null will not be null safe.
 
+### Case-Insensitive Property Access
+
+Property access is case-sensitive by default. To enable case-insensitive
+property access, set the `caseInsensitivePropertyAccess` option when creating
+the AST factory.
+
+```ts
+import {parse, EvalAstFactory} from 'jexpr';
+
+// An EvalAstFactory produces an AST that can be evaluated
+const astFactory = new EvalAstFactory().setOptions({caseInsensitivePropertyAccess: true});
+
+// parse() returns the AST
+const expr = parse('foo', astFactory);
+
+// evaluate() with a scope object
+const result = expr.evaluate({
+  Foo: 'Bar'
+});
+
+console.log(result); // Bar
+```
+
 ## Syntax
 
 ### Property access

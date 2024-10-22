@@ -3,13 +3,22 @@ import assert from 'node:assert';
 
 import * as evaluate from '../lib/eval.js';
 import * as parser from '../lib/parser.js';
+import {AstFactoryOptions} from '../lib/ast_factory.js';
 
 const Parser = parser.Parser;
 
 const astFactory = new evaluate.EvalAstFactory();
 
-function expectEval(s: string, expected: any, scope?: evaluate.Scope) {
-  const expr = new Parser(s, astFactory).parse();
+function expectEval(
+  s: string,
+  expected: any,
+  scope?: evaluate.Scope,
+  options?: AstFactoryOptions,
+) {
+  const expr = new Parser(
+    s,
+    options ? new evaluate.EvalAstFactory().setOptions(options) : astFactory,
+  ).parse();
   const result = expr!.evaluate(scope!);
   assert.deepEqual(result, expected);
 }
@@ -262,5 +271,19 @@ suite('eval', function () {
     expectEval('x().toString()', undefined, foo);
     expectEval('x(name)', undefined, foo);
     expectEval('x()()', undefined, foo);
+  });
+
+  test('should support case insensitive property access', function () {
+    expectEval('foo', 'bar', {foo: 'bar'});
+    expectEval('Foo', undefined, {foo: 'bar'});
+    expectEval('Foo', 'bar', {foo: 'bar'}, {caseInsensitivePropertyAccess: true});
+    
+    expectEval('foo.bar', 'alice', {foo: {bar: 'alice'}});
+    expectEval('Foo.Bar', undefined, {foo: {bar: 'alice'}});
+    expectEval('Foo.Bar', 'alice', {foo: {bar: 'alice'}}, {caseInsensitivePropertyAccess: true});
+    
+    expectEval('foo.bar[0].First', 'last', {foo: {bar: [{First: 'last'}]}});
+    expectEval('Foo.Bar[0].first', undefined, {foo: {bar: [{First: 'last'}]}});
+    expectEval('Foo.Bar[0].first', 'last', {foo: {bar: [{First: 'last'}]}}, {caseInsensitivePropertyAccess: true});
   });
 });
